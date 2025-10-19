@@ -2,6 +2,7 @@ use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_groth16::Groth16;
+use ark_relations::r1cs::ConstraintSynthesizer;
 use std::str::FromStr;
 
 use crate::{
@@ -15,11 +16,11 @@ pub mod utils;
 
 type F = ark_bn254::Fr;
 type Sha256Digest = Vec<u8>;
-type Groth16Proof = <Groth16<Bn254> as SNARK<ark_bn254::Fr>>::Proof;
-type Groth16ProvingKey = <Groth16<Bn254> as SNARK<ark_bn254::Fr>>::ProvingKey;
-type Groth16VerifyingKey = <Groth16<Bn254> as SNARK<ark_bn254::Fr>>::VerifyingKey;
+type Groth16Proof = <Groth16<Bn254> as SNARK<F>>::Proof;
+type Groth16ProvingKey = <Groth16<Bn254> as SNARK<F>>::ProvingKey;
+type Groth16VerifyingKey = <Groth16<Bn254> as SNARK<F>>::VerifyingKey;
 
-const MAX_CREDENTIALS: usize = 5;
+const MAX_CREDENTIALS: usize = 3;
 const CUTOFF_YEAR: &'static str = "2006"; // 성인 연령 기준 연도
 
 #[cfg(test)]
@@ -56,10 +57,10 @@ mod test {
         pub input: [u8; 32],
     }
 
-    impl ConstraintSynthesizer<ark_bn254::Fr> for TestCircuitWitnessOnly {
+    impl ConstraintSynthesizer<F> for TestCircuitWitnessOnly {
         fn generate_constraints(
             self,
-            cs: ark_relations::r1cs::ConstraintSystemRef<ark_bn254::Fr>,
+            cs: ark_relations::r1cs::ConstraintSystemRef<F>,
         ) -> ark_relations::r1cs::Result<()> {
             let input_var = to_byte_vars(cs.clone(), &self.input);
             // witness로 할당
@@ -76,10 +77,10 @@ mod test {
         }
     }
 
-    impl ConstraintSynthesizer<ark_bn254::Fr> for TestCircuitPublicInput {
+    impl ConstraintSynthesizer<F> for TestCircuitPublicInput {
         fn generate_constraints(
             self,
-            cs: ark_relations::r1cs::ConstraintSystemRef<ark_bn254::Fr>,
+            cs: ark_relations::r1cs::ConstraintSystemRef<F>,
         ) -> ark_relations::r1cs::Result<()> {
             let input_var = to_byte_vars(cs.clone(), &self.input);
             // public input으로 할당
@@ -109,7 +110,7 @@ mod test {
         };
 
         // 1. constraint 생성 / 만족 여부 검사 / constraint 개수 출력
-        let cs = ark_relations::r1cs::ConstraintSystem::<ark_bn254::Fr>::new_ref();
+        let cs = ark_relations::r1cs::ConstraintSystem::<F>::new_ref();
         circuit.clone().generate_constraints(cs.clone()).unwrap();
 
         assert!(cs.is_satisfied().unwrap());
@@ -141,7 +142,7 @@ mod test {
         };
 
         // 1. constraint 생성 / 만족 여부 검사 / constraint 개수 출력
-        let cs = ark_relations::r1cs::ConstraintSystem::<ark_bn254::Fr>::new_ref();
+        let cs = ark_relations::r1cs::ConstraintSystem::<F>::new_ref();
         circuit.clone().generate_constraints(cs.clone()).unwrap();
 
         assert!(cs.is_satisfied().unwrap());
@@ -187,6 +188,7 @@ fn main() {
         credentials.push(cred);
     }
 
+    // Issuer의 credential 발급. credentials를 해시하여 publish
     for cred in &credentials {
         issuer.issue_credential(cred).unwrap();
     }
@@ -201,6 +203,7 @@ fn main() {
     let holder_2005 = Holder::new("2005", credentials[0].clone());
     let holder_2007 = Holder::new("2007", credentials[2].clone());
 
+    // public input으로 사용
     let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
 
     let verifier = Verifier::new("2");
@@ -225,16 +228,28 @@ fn main() {
         // holder가 2007년생인 circuit
         let age_circuit_2007 = AgeCircuit {
             dob_cutoff_year: CUTOFF_YEAR.to_string(),
-            hashed_credentials: hashed_creds,
+            hashed_credentials: hashed_creds.clone(),
             credential: holder_2007.credentials.clone(),
         };
 
         // prove
-        let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2007).unwrap();
+        let proof_2007 = Holder::prove(proving_key.clone(), age_circuit_2007).unwrap();
 
         // verify
-        Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2005).unwrap()
+        Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2007).unwrap()
     };
+
+    // constraint 개수 출력
+    {
+        let cs = ark_relations::r1cs::ConstraintSystem::<F>::new_ref();
+        let circuit = AgeCircuit {
+            dob_cutoff_year: CUTOFF_YEAR.to_string(),
+            hashed_credentials: hashed_creds,
+            credential: holder_2005.credentials.clone(),
+        };
+        circuit.clone().generate_constraints(cs.clone()).unwrap();
+        println!("Number of constraints: {}", cs.num_constraints());
+    }
 
     assert!(is_valid_2005 && !is_valid_2007);
 }
