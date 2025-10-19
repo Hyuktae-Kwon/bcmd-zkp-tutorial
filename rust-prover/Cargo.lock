@@ -203,24 +203,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-sponge"
-version = "0.4.0-alpha"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ef89196ee0e3476918437e3a0f23c9d5fae9602794fb3272128de66a0fbebd0"
-dependencies = [
- "ark-ec",
- "ark-ff",
- "ark-r1cs-std",
- "ark-relations",
- "ark-serialize",
- "ark-std",
- "derivative",
- "digest",
- "rand_chacha",
- "tracing",
-]
-
-[[package]]
 name = "ark-std"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -531,7 +513,6 @@ dependencies = [
  "ark-r1cs-std",
  "ark-relations",
  "ark-serialize",
- "ark-sponge",
  "ark-std",
  "num-bigint",
  "rand",

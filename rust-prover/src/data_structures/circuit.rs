@@ -18,10 +18,10 @@ pub struct AgeCircuit {
     pub credential: Credential,
 }
 
-impl ConstraintSynthesizer<ark_bn254::Fr> for AgeCircuit {
+impl ConstraintSynthesizer<F> for AgeCircuit {
     fn generate_constraints(
         self,
-        cs: ark_relations::r1cs::ConstraintSystemRef<ark_bn254::Fr>,
+        cs: ark_relations::r1cs::ConstraintSystemRef<F>,
     ) -> ark_relations::r1cs::Result<()> {
         // -------------------- public input 할당 --------------------
         // circuit 안에서 사용하는 값은 변수명에 _var 접미사를 붙임
