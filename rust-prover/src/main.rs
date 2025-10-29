@@ -4,7 +4,6 @@ use ark_ec::pairing::Pairing;
 use ark_groth16::Groth16;
 use ark_relations::r1cs::ConstraintSynthesizer;
 use std::str::FromStr;
-
 use crate::{
     data_structures::{circuit::AgeCircuit, credential::Credential},
     entities::{holder::Holder, issuer::Issuer, verifier::Verifier},
@@ -172,84 +171,89 @@ mod test {
         let result = Groth16::<Bn254>::verify(&vk, &public_inputs, &proof).unwrap();
         assert!(result);
     }
+
+    #[test]
+    fn test_did_scenario() {
+        let mut issuer = Issuer::new("1");
+
+        let mut credentials = Vec::new();
+        for i in 0..MAX_CREDENTIALS {
+            let cred = Credential {
+                issuer_id: issuer.id.clone(),
+                holder_name: format!("{}", 2005 + i as u32),
+                holder_dob_year: format!("{}", 2005 + i as u32), // 2005, 2006, 2007, ...
+                randomness: rand::random::<u128>().to_string(),
+            };
+            credentials.push(cred);
+        }
+
+        // Issuer의 credential 발급. credentials를 해시하여 publish
+        for cred in &credentials {
+            issuer.issue_credential(cred).unwrap();
+        }
+
+        // Issuer가 publish한 해시된 credentials
+        let hashed_creds: [Sha256Digest; MAX_CREDENTIALS] = issuer
+            .hashed_credentials()
+            .unwrap()
+            .try_into()
+            .expect("Wrong length");
+
+        let holder_2005 = Holder::new("2005", credentials[0].clone());
+        let holder_2007 = Holder::new("2007", credentials[2].clone());
+
+        // public input으로 사용
+        let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
+
+        let verifier = Verifier::new("2");
+        let (proving_key, verifying_key) = verifier.setup().unwrap();
+
+        let is_valid_2005 = {
+            // holder가 2005년생인 circuit
+            let age_circuit_2005 = AgeCircuit {
+                dob_cutoff_year: CUTOFF_YEAR.to_string(),
+                hashed_credentials: hashed_creds.clone(),
+                credential: holder_2005.credentials.clone(),
+            };
+
+            // prove
+            let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2005).unwrap();
+
+            // verify
+            Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2005).unwrap()
+        };
+
+        // 2007년생인 holder는 만 18세 미만이므로 검증 실패해야 함
+        let is_valid_2007 = {
+            // holder가 2007년생인 circuit
+            let age_circuit_2007 = AgeCircuit {
+                dob_cutoff_year: CUTOFF_YEAR.to_string(),
+                hashed_credentials: hashed_creds.clone(),
+                credential: holder_2007.credentials.clone(),
+            };
+
+            // prove
+            let proof_2007 = Holder::prove(proving_key.clone(), age_circuit_2007).unwrap();
+
+            // verify
+            Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2007).unwrap()
+        };
+
+        // constraint 개수 출력
+        {
+            let cs = ark_relations::r1cs::ConstraintSystem::<F>::new_ref();
+            let circuit = AgeCircuit {
+                dob_cutoff_year: CUTOFF_YEAR.to_string(),
+                hashed_credentials: hashed_creds,
+                credential: holder_2005.credentials.clone(),
+            };
+            circuit.clone().generate_constraints(cs.clone()).unwrap();
+            println!("Number of constraints: {}", cs.num_constraints());
+        }
+
+        // 2005년생은 검증에 성공하고 2007년생은 실패해야 함
+        assert!(is_valid_2005 && !is_valid_2007);
+    }
 }
 
-fn main() {
-    let mut issuer = Issuer::new("1");
-
-    let mut credentials = Vec::new();
-    for i in 0..MAX_CREDENTIALS {
-        let cred = Credential {
-            issuer_id: issuer.id.clone(),
-            holder_name: format!("{}", 2005 + i as u32),
-            holder_dob_year: format!("{}", 2005 + i as u32), // 2005, 2006, 2007, ...
-            randomness: rand::random::<u128>().to_string(),
-        };
-        credentials.push(cred);
-    }
-
-    // Issuer의 credential 발급. credentials를 해시하여 publish
-    for cred in &credentials {
-        issuer.issue_credential(cred).unwrap();
-    }
-
-    // Issuer가 publish한 해시된 credentials
-    let hashed_creds: [Sha256Digest; MAX_CREDENTIALS] = issuer
-        .hashed_credentials()
-        .unwrap()
-        .try_into()
-        .expect("Wrong length");
-
-    let holder_2005 = Holder::new("2005", credentials[0].clone());
-    let holder_2007 = Holder::new("2007", credentials[2].clone());
-
-    // public input으로 사용
-    let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
-
-    let verifier = Verifier::new("2");
-    let (proving_key, verifying_key) = verifier.setup().unwrap();
-
-    let is_valid_2005 = {
-        // holder가 2005년생인 circuit
-        let age_circuit_2005 = AgeCircuit {
-            dob_cutoff_year: CUTOFF_YEAR.to_string(),
-            hashed_credentials: hashed_creds.clone(),
-            credential: holder_2005.credentials.clone(),
-        };
-
-        // prove
-        let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2005).unwrap();
-
-        // verify
-        Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2005).unwrap()
-    };
-
-    let is_valid_2007 = {
-        // holder가 2007년생인 circuit
-        let age_circuit_2007 = AgeCircuit {
-            dob_cutoff_year: CUTOFF_YEAR.to_string(),
-            hashed_credentials: hashed_creds.clone(),
-            credential: holder_2007.credentials.clone(),
-        };
-
-        // prove
-        let proof_2007 = Holder::prove(proving_key.clone(), age_circuit_2007).unwrap();
-
-        // verify
-        Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2007).unwrap()
-    };
-
-    // constraint 개수 출력
-    {
-        let cs = ark_relations::r1cs::ConstraintSystem::<F>::new_ref();
-        let circuit = AgeCircuit {
-            dob_cutoff_year: CUTOFF_YEAR.to_string(),
-            hashed_credentials: hashed_creds,
-            credential: holder_2005.credentials.clone(),
-        };
-        circuit.clone().generate_constraints(cs.clone()).unwrap();
-        println!("Number of constraints: {}", cs.num_constraints());
-    }
-
-    assert!(is_valid_2005 && !is_valid_2007);
-}
+fn main() {}
