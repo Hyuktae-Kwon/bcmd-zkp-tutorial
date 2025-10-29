@@ -31,7 +31,7 @@ contract Groth16VerifyBn254 {
         Pairing.G2Point beta2;
         Pairing.G2Point gamma2;
         Pairing.G2Point delta2;
-        Pairing.G1Point[13] public_input;
+        Pairing.G1Point[2] public_input;
     }
 
     struct Proof {
@@ -48,7 +48,7 @@ contract Groth16VerifyBn254 {
 
     function verifyProof(
         uint256[8] memory proof,
-        uint256[12] memory input,
+        uint256[1] memory input,
         VerifyingKey memory vk
     ) public {
         Proof memory _proof;

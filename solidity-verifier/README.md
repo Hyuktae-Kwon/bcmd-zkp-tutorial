@@ -13,4 +13,21 @@ solidity 를 사용하여 rust-prover 에서 생성한 영지식증명을 스트
 ### 사전 요구 사항
 
 - VSCode 에 [solidity](https://marketplace.visualstudio.com/items?itemName=JuanBlanco.solidity) 익스텐션을 설치합니다.
-- nodejs 가 필요합니다(hardhat 을 위해).
+- npm, nodejs 가 필요합니다(hardhat 을 위해).
+
+### 실행 코드
+
+```
+npm i
+npx hardhat node
+npx hardhat run scripts/deploy_verifier.js --network localhost
+npx hardhat run scripts/verify_proof.js --network localhost
+```
+
+만약 hardhat node 를 실행하는 데에 오류가 발생한다면, 다음의 코드를 실행합니다.
+
+```
+brew install nvm
+nvm install 22.10.0
+nvm use 22.10.0
+```
