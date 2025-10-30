@@ -32,3 +32,19 @@ Verifier
 Relation
 
 - "Issuer가 공개한 hashed credential list에 포함되어 있으면서 19세 이상인 credential `cred`가 존재한다."
+
+## solidity-verifier
+
+solidity 를 사용하여 스트컨트랙트에서 영지식증명을 검증하는 코드
+
+### `Pairing.sol`
+
+`Groth16` 에서 사용하는 `pairing` 과 관련된 solidity 코드.
+
+### `Groth16VerifyBn254.sol`
+
+`solidity` 에서 Groth16 을 검증하는 코드.
+
+### `Verifier.sol`
+
+`rust-prover`에서 생성된 증명을 검증하는 스마트 컨트랙트. `Groth16` 라이브러리를 사용하여 검증을 수행.
