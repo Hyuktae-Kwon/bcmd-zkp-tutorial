@@ -1,5 +1,5 @@
 use ark_ec::pairing::Pairing;
-use ark_ff::{Field, Fp, Fp2, Fp2Config, FpConfig, Zero};
+use ark_ff::{Fp, Fp2, Fp2Config, FpConfig, Zero};
 use ark_groth16::{Proof, VerifyingKey};
 use std::fmt::Display;
 
