@@ -44,7 +44,3 @@ solidity 를 사용하여 스트컨트랙트에서 영지식증명을 검증하�
 ### `Groth16VerifyBn254.sol`
 
 `solidity` 에서 Groth16 을 검증하는 코드.
-
-### `Verifier.sol`
-
-`rust-prover`에서 생성된 증명을 검증하는 스마트 컨트랙트. `Groth16` 라이브러리를 사용하여 검증을 수행.
