@@ -2,19 +2,18 @@
 
 이 프로젝트는 Rust와 `arkworks` 라이브러리를 사용하여 간단한 영지식 증명(ZKP) 시스템을 구현한 예제입니다. 사용자의 정확한 생년월일을 노출하지 않고 특정 연령 이상임을 증명하는 시나리오를 다룹니다.
 
-## 🚀 주요 기능
+## 주요 기능
 
 - **Entities**: `Issuer`(발급자), `Holder`(소유자), `Verifier`(검증자).
 - **영지식 증명**: `ark-groth16`을 사용하여 Groth16 증명 시스템을 구현합니다.
 - **해시 함수**: `SHA256`을 사용하여 자격증명을 해시하고 데이터 무결성을 보장합니다.
 - **나이 증명 회로**: 사용자가 기준 연도 이전에 태어났음을 증명하는 R1CS 회로를 구현합니다.
 
-## 📂 프로젝트 구조
+## 프로젝트 구조
 
 ```
 /
 ├── Cargo.toml       # 프로젝트 의존성 및 메타데이터
-├── run_main.sh      # 메인 애플리케이션 실행 스크립트
 ├── run_test.sh      # 테스트 실행 스크립트
 └── src/
     ├── main.rs      # 메인 애플리케이션 로직 및 테스트
@@ -30,13 +29,7 @@
         └── solidity
 ```
 
-## 🛠️ 사용 방법
-
-### 사전 요구 사항
-
-- [Rust](https://www.rust-lang.org/tools/install)
-
-## 📜 워크플로우
+## 워크플로우
 
 1.  **credential 발급**:
     - `Issuer`가 `Holder`에게 이름, 생년월일 등이 포함된 `Credential`(자격증명)을 발급합니다.
@@ -53,8 +46,8 @@
 
 ## main 함수 실행 방법
 
-1. solidity-verifier 폴더에서 hardhat을 실행합니다.
+1. solidity-verifier 폴더에서 hardhat을 실행합니다. (`solidity-verifier/README.md` 참고)
 2. rust-prover 폴더에서 .env 의 변수를 설정합니다. (hardhat의 주소, private key 등)
 3. deploy_verifier.js 를 이용하여 contract 를 배포합니다.
 4. main 함수의 contract_address 변수에 배포된 contract 주소를 입력합니다.
-5. cargo run --release 명령어로 main 함수를 실행합니다.
+5. cargo run --release -- --nocapture 명령어로 main 함수를 실행합니다.

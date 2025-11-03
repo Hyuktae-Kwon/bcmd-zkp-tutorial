@@ -11,10 +11,9 @@ use std::str::FromStr;
 pub struct AgeCircuit {
     // public input
     pub dob_cutoff_year: String,
+    pub hashed_credentials: [Sha256Digest; MAX_CREDENTIALS],
 
     // witness
-    // 간단히 하기 위해 hased_credentials를 witness로 사용
-    pub hashed_credentials: [Sha256Digest; MAX_CREDENTIALS],
     pub credential: Credential,
 }
 
@@ -29,15 +28,16 @@ impl ConstraintSynthesizer<F> for AgeCircuit {
             Ok(F::from_str(&self.dob_cutoff_year).unwrap())
         })?;
 
-        // -------------------- witness 할당 --------------------
         let credential_hash_var_1 =
-            DigestVar::<F>::new_witness(cs.clone(), || Ok(self.hashed_credentials[0].clone()))?;
+            DigestVar::<F>::new_input(cs.clone(), || Ok(self.hashed_credentials[0].clone()))?;
 
         let credential_hash_var_2 =
-            DigestVar::<F>::new_witness(cs.clone(), || Ok(self.hashed_credentials[1].clone()))?;
+            DigestVar::<F>::new_input(cs.clone(), || Ok(self.hashed_credentials[1].clone()))?;
 
         let credential_hash_var_3 =
-            DigestVar::<F>::new_witness(cs.clone(), || Ok(self.hashed_credentials[2].clone()))?;
+            DigestVar::<F>::new_input(cs.clone(), || Ok(self.hashed_credentials[2].clone()))?;
+
+        // -------------------- witness 할당 --------------------
 
         let holder_dob_year_var = FpVar::new_witness(cs.clone(), || {
             Ok(F::from_str(&self.credential.holder_dob_year).unwrap())
