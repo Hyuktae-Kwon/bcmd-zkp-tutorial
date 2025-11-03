@@ -207,8 +207,29 @@ mod test {
         let holder_2005 = Holder::new("2005", credentials[0].clone());
         let holder_2007 = Holder::new("2007", credentials[2].clone());
 
-        // public input으로 사용
-        let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
+        let public_inputs = {
+            let mut public_inputs = Vec::new();
+
+            // circuit의 generate_constraints에서와 "동일한 순서"로 public input 제공
+            let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
+            public_inputs.push(cutoff_year);
+
+            // hashed_credentials의 각 credential의 바이트를 비트 단위로 field 원소로 변환하여 public input으로 사용
+            for cred in &hashed_creds {
+                let cred_bytes: &[u8] = cred;
+                for byte in cred_bytes.iter() {
+                    for i in 0..8 {
+                        // Little-endian
+                        if (byte >> i) & 1 == 1 {
+                            public_inputs.push(F::one());
+                        } else {
+                            public_inputs.push(F::zero());
+                        }
+                    }
+                }
+            }
+            public_inputs
+        };
 
         let verifier = Verifier::new("2");
         let (proving_key, verifying_key) = verifier.setup().unwrap();
@@ -225,7 +246,7 @@ mod test {
             let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2005).unwrap();
 
             // verify
-            Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2005).unwrap()
+            Groth16::<Bn254>::verify(&verifying_key, &public_inputs, &proof_2005).unwrap()
         };
 
         // 2007년생인 holder는 만 18세 미만이므로 검증 실패해야 함
@@ -241,7 +262,7 @@ mod test {
             let proof_2007 = Holder::prove(proving_key.clone(), age_circuit_2007).unwrap();
 
             // verify
-            Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2007).unwrap()
+            Groth16::<Bn254>::verify(&verifying_key, &public_inputs, &proof_2007).unwrap()
         };
 
         // constraint 개수 출력

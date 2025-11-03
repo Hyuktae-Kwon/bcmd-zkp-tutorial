@@ -3,7 +3,9 @@ use crate::{
 };
 
 use ark_crypto_primitives::crh::sha256::constraints::{DigestVar, Sha256Gadget};
-use ark_r1cs_std::{alloc::AllocVar, eq::EqGadget, fields::fp::FpVar, prelude::Boolean};
+use ark_r1cs_std::{
+    ToBytesGadget, alloc::AllocVar, eq::EqGadget, fields::fp::FpVar, prelude::Boolean,
+};
 use ark_relations::r1cs::ConstraintSynthesizer;
 use std::str::FromStr;
 
@@ -57,10 +59,7 @@ impl ConstraintSynthesizer<F> for AgeCircuit {
             ))
             .unwrap();
         sha256_var
-            .update(&to_byte_vars(
-                cs.clone(),
-                &string_to_bytes(&self.credential.holder_dob_year),
-            ))
+            .update(&holder_dob_year_var.to_bytes().unwrap())
             .unwrap();
         sha256_var
             .update(&to_byte_vars(
