@@ -1,6 +1,6 @@
 use ark_ec::{
-    twisted_edwards::{Affine, Projective, TECurveConfig},
     AffineRepr,
+    twisted_edwards::{Affine, Projective, TECurveConfig},
 };
 
 use super::ToSolidity;

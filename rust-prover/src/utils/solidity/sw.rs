@@ -1,6 +1,6 @@
 use ark_ec::{
-    short_weierstrass::{Affine, Projective, SWCurveConfig},
     AffineRepr,
+    short_weierstrass::{Affine, Projective, SWCurveConfig},
 };
 
 use super::ToSolidity;
