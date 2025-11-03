@@ -1,16 +1,15 @@
+use crate::{
+    data_structures::{circuit::AgeCircuit, credential::Credential},
+    entities::{holder::Holder, issuer::Issuer, verifier::Verifier},
+    utils::solidity::ToSolidity,
+};
 use ark_bn254::Bn254;
 use ark_crypto_primitives::snark::SNARK;
 use ark_ec::pairing::Pairing;
 use ark_groth16::Groth16;
-use std::str::FromStr;
-use std::sync::Arc;
-use crate::{
-    data_structures::{circuit::AgeCircuit, credential::Credential},
-    entities::{holder::Holder, issuer::Issuer, verifier::Verifier},
-};
-use crate::utils::solidity::ToSolidity;
+use ark_std::{One, Zero};
 use ethers::prelude::*;
-use std::time::Duration;
+use std::{str::FromStr, sync::Arc, time::Duration};
 
 pub mod data_structures;
 pub mod entities;
@@ -27,6 +26,7 @@ const CUTOFF_YEAR: &'static str = "2006"; // 성인 연령 기준 연도
 
 abigen!(Groth16Verifier, "./abi.json");
 
+// SHA256 해시의 preimage를 증명하는 회로 테스트
 #[cfg(test)]
 mod test {
     use super::*;
@@ -271,11 +271,12 @@ async fn send_tx(
     let rpc_url = std::env::var("RPC_URL").expect("RPC_URL must be set");
     let private_key = std::env::var("PRIVATE_KEY").expect("PRIVATE_KEY must be set");
 
-    let provider = Provider::<Http>::try_from(rpc_url)?
-        .interval(Duration::from_millis(10u64));
+    let provider = Provider::<Http>::try_from(rpc_url)?.interval(Duration::from_millis(10u64));
     let chain_id = provider.get_chainid().await?;
 
-    let wallet = private_key.parse::<LocalWallet>()?.with_chain_id(chain_id.as_u64());
+    let wallet = private_key
+        .parse::<LocalWallet>()?
+        .with_chain_id(chain_id.as_u64());
     let client = SignerMiddleware::new(provider, wallet.clone());
     let client = Arc::new(client);
 
@@ -286,43 +287,63 @@ async fn send_tx(
         proof_uints[i] = U256::from_str_radix(&proof[i], 10)?;
     }
 
-    let mut inputs: [U256; 1] = [U256::zero(); 1];
-    inputs[0] = U256::from_str_radix(&public_inputs[0], 10)?;
+    // SHA256의 각 해시 값의 비트를 field 원소로 변환하여 public input으로 제공
+    // 3* 256 + 1 (cutoff year) = 769
+    let mut inputs: [U256; 769] = [U256::zero(); 769];
+    for i in 0..769 {
+        inputs[i] = U256::from_str_radix(&public_inputs[i], 10)?;
+    }
 
     let vk_alpha1 = G1Point {
         x: U256::from_str_radix(&vk[0], 10)?,
         y: U256::from_str_radix(&vk[1], 10)?,
     };
     let vk_beta2 = G2Point {
-        x: [U256::from_str_radix(&vk[2], 10)?, U256::from_str_radix(&vk[3], 10)?],
-        y: [U256::from_str_radix(&vk[4], 10)?, U256::from_str_radix(&vk[5], 10)?],
+        x: [
+            U256::from_str_radix(&vk[2], 10)?,
+            U256::from_str_radix(&vk[3], 10)?,
+        ],
+        y: [
+            U256::from_str_radix(&vk[4], 10)?,
+            U256::from_str_radix(&vk[5], 10)?,
+        ],
     };
     let vk_gamma2 = G2Point {
-        x: [U256::from_str_radix(&vk[6], 10)?, U256::from_str_radix(&vk[7], 10)?],
-        y: [U256::from_str_radix(&vk[8], 10)?, U256::from_str_radix(&vk[9], 10)?],
+        x: [
+            U256::from_str_radix(&vk[6], 10)?,
+            U256::from_str_radix(&vk[7], 10)?,
+        ],
+        y: [
+            U256::from_str_radix(&vk[8], 10)?,
+            U256::from_str_radix(&vk[9], 10)?,
+        ],
     };
     let vk_delta2 = G2Point {
-        x: [U256::from_str_radix(&vk[10], 10)?, U256::from_str_radix(&vk[11], 10)?],
-        y: [U256::from_str_radix(&vk[12], 10)?, U256::from_str_radix(&vk[13], 10)?],
+        x: [
+            U256::from_str_radix(&vk[10], 10)?,
+            U256::from_str_radix(&vk[11], 10)?,
+        ],
+        y: [
+            U256::from_str_radix(&vk[12], 10)?,
+            U256::from_str_radix(&vk[13], 10)?,
+        ],
     };
 
     let mut vk_public_input_unconverted = vec![];
     for i in (14..vk.len()).step_by(2) {
         vk_public_input_unconverted.push([
             U256::from_str_radix(&vk[i], 10)?,
-            U256::from_str_radix(&vk[i+1], 10)?,
+            U256::from_str_radix(&vk[i + 1], 10)?,
         ]);
     }
-    let vk_public_input: [G1Point; 2] = [
-        G1Point {
-            x: vk_public_input_unconverted[0][0],
-            y: vk_public_input_unconverted[0][1],
-        },
-        G1Point {
-            x: vk_public_input_unconverted[1][0],
-            y: vk_public_input_unconverted[1][1],
-        },
-    ];
+    let vk_public_input: Vec<G1Point> = vk_public_input_unconverted
+        .into_iter()
+        .map(|p| G1Point { x: p[0], y: p[1] })
+        .collect();
+
+    let vk_public_input: [G1Point; 770] = vk_public_input
+        .try_into()
+        .expect("vk_public_input_vec should have 770 elements");
 
     let verifying_key = VerifyingKey {
         alpha_1: vk_alpha1,
@@ -349,6 +370,8 @@ async fn send_tx(
 async fn main() {
     let mut issuer = Issuer::new("1");
 
+    // ------------------------------ Issuer ------------------------------
+    // credential 준비
     let mut credentials = Vec::new();
     for i in 0..MAX_CREDENTIALS {
         let cred = Credential {
@@ -372,13 +395,39 @@ async fn main() {
         .try_into()
         .expect("Wrong length");
 
-    let holder_2005 = Holder::new("2005", credentials[0].clone());
+    // ------------------------------ Verifier ------------------------------
 
-    // public input으로 사용
-    let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
-
+    // verifier의 circuit setup
     let verifier = Verifier::new("2");
     let (proving_key, verifying_key) = verifier.setup().unwrap();
+
+    let public_inputs = {
+        let mut public_inputs = Vec::new();
+
+        // circuit의 generate_constraints에서와 "동일한 순서"로 public input 제공
+        let cutoff_year = <<Bn254 as Pairing>::ScalarField>::from_str(CUTOFF_YEAR).unwrap();
+        public_inputs.push(cutoff_year);
+
+        // hashed_credentials의 각 credential의 바이트를 비트 단위로 field 원소로 변환하여 public input으로 사용
+        for cred in &hashed_creds {
+            let cred_bytes: &[u8] = cred;
+            for byte in cred_bytes.iter() {
+                for i in 0..8 {
+                    // Little-endian
+                    if (byte >> i) & 1 == 1 {
+                        public_inputs.push(F::one());
+                    } else {
+                        public_inputs.push(F::zero());
+                    }
+                }
+            }
+        }
+        public_inputs
+    };
+
+    // ------------------------------ Holder ------------------------------
+    // 2005년생 holder
+    let holder_2005 = Holder::new("2005", credentials[0].clone());
 
     let age_circuit_2005 = AgeCircuit {
         dob_cutoff_year: CUTOFF_YEAR.to_string(),
@@ -387,10 +436,13 @@ async fn main() {
     };
 
     // 증명 생성 후 local 에서 검증
-    let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2005).unwrap();
-    let is_valid_2005 = Groth16::<Bn254>::verify(&verifying_key, &[cutoff_year], &proof_2005).unwrap();
+    let proof_2005 = Holder::prove(proving_key.clone(), age_circuit_2005.clone()).unwrap();
+
+    let is_valid_2005 =
+        Groth16::<Bn254>::verify(&verifying_key, &public_inputs, &proof_2005).unwrap();
     assert!(is_valid_2005);
 
+    // ------------------------------ Verifier ------------------------------
     // for solidity verifier contract
     let vk_solidity = verifying_key.to_solidity();
     println!("Verifying Key for Solidity: {:?}", vk_solidity);
@@ -398,11 +450,19 @@ async fn main() {
     let proof_solidity = proof_2005.to_solidity();
     println!("Proof for Solidity: {:?}", proof_solidity);
 
-    let public_inputs_solidity: Vec<String> = vec![cutoff_year].to_solidity();
+    let public_inputs_solidity: Vec<String> = public_inputs.to_solidity();
     println!("Public Inputs for Solidity: {:?}", public_inputs_solidity);
 
-    let contract_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3".parse::<Address>().unwrap();
+    let contract_address = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        .parse::<Address>()
+        .unwrap();
 
-    send_tx(proof_solidity, public_inputs_solidity, vk_solidity, contract_address).await.unwrap();
-
+    send_tx(
+        proof_solidity,
+        public_inputs_solidity,
+        vk_solidity,
+        contract_address,
+    )
+    .await
+    .unwrap();
 }
