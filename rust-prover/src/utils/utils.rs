@@ -1,5 +1,9 @@
-use ark_r1cs_std::uint8::UInt8;
+use ark_bn254::Fr;
+use ark_ff::BigInteger;
+use ark_ff::PrimeField;
+use ark_r1cs_std::{ToBytesGadget, uint8::UInt8};
 use ark_relations::r1cs::Namespace;
+use std::str::FromStr;
 
 use crate::F;
 
@@ -11,9 +15,11 @@ pub fn to_byte_vars(cs: impl Into<Namespace<F>>, data: &[u8]) -> Vec<UInt8<F>> {
 
 /// string을 [u8; 32]로 변환
 pub fn string_to_bytes(s: &str) -> [u8; 32] {
-    let mut bytes = [0u8; 32];
-    let s_bytes = s.as_bytes();
-    let len = s_bytes.len().min(32);
-    bytes[..len].copy_from_slice(&s_bytes[..len]);
-    bytes
+    let f = Fr::from_str(s).unwrap();
+    let f_bigint = f.into_bigint();
+    let f_bytes_vec = f_bigint.to_bytes_le();
+    let f_bytes_arr: [u8; 32] = f_bytes_vec
+        .try_into()
+        .expect("Failed to convert field element bytes to array");
+    f_bytes_arr
 }
